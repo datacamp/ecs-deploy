@@ -80,6 +80,8 @@ func (c *Controller) Deploy(serviceName string, d service.Deploy) (*service.Depl
 					return nil, err
 				}
 			}
+		} else {
+			return nil, errors.New("IAM Task Role not found and resource creation is disabled")
 		}
 	} else if err != nil {
 		return nil, err
@@ -105,15 +107,20 @@ func (c *Controller) Deploy(serviceName string, d service.Deploy) (*service.Depl
 				controllerLogger.Errorf("Could not create service %v", serviceName)
 				return nil, err
 			}
-		}
-		err = c.createServiceInDynamo(s, d)
-		if err != nil {
-			controllerLogger.Errorf("Could not create service %v in dynamodb", serviceName)
-			return nil, err
+		} else {
+			return nil, errors.New("ECS Service not found and resource creation is disabled")
 		}
 	} else if err != nil {
 		return nil, errors.New("Error during checking whether service exists")
 	} else {
+		serviceExistsInDynamo, err := s.ServiceExistsInDynamo()
+		if err == nil && !serviceExistsInDynamo {
+			err = c.createServiceInDynamo(s, d)
+			if err != nil {
+				controllerLogger.Errorf("Could not create service %v in dynamodb", serviceName)
+				return nil, err
+			}
+		}
 		c.updateDeployment(d, ddLast, serviceName, taskDefArn, iamRoleArn)
 	}
 
@@ -153,9 +160,9 @@ func (c *Controller) updateDeployment(d service.Deploy, ddLast *service.DynamoDe
 	updateECSService := true
 	// compare with previous deployment if there is one
 	if ddLast != nil {
+		var err error
 		if strings.ToLower(d.ServiceProtocol) != "none" {
 			var alb *ecs.ALB
-			var err error
 			if d.LoadBalancer == "" {
 				alb, err = ecs.NewALB(d.Cluster)
 			} else {
@@ -241,26 +248,26 @@ func (c *Controller) updateDeployment(d service.Deploy, ddLast *service.DynamoDe
 				// don't update ecs service later
 				updateECSService = false
 			}
-			ps := ecs.Paramstore{}
-			if ps.IsEnabled() {
-				iam := ecs.IAM{}
-				thisNamespace, lastNamespace := d.EnvNamespace, ddLast.DeployData.EnvNamespace
-				if thisNamespace == "" {
-					thisNamespace = serviceName
+		}
+		ps := ecs.Paramstore{}
+		if ps.IsEnabled() {
+			iam := ecs.IAM{}
+			thisNamespace, lastNamespace := d.EnvNamespace, ddLast.DeployData.EnvNamespace
+			if thisNamespace == "" {
+				thisNamespace = serviceName
+			}
+			if lastNamespace == "" {
+				lastNamespace = serviceName
+			}
+			if thisNamespace != lastNamespace {
+				controllerLogger.Debugf("Paramstore enabled, putting role: paramstore-%v", serviceName)
+				err = iam.DeleteRolePolicy("ecs-"+serviceName, "paramstore-"+lastNamespace)
+				if err != nil {
+					return err
 				}
-				if lastNamespace == "" {
-					lastNamespace = serviceName
-				}
-				if thisNamespace != lastNamespace {
-					controllerLogger.Debugf("Paramstore enabled, putting role: paramstore-%v", serviceName)
-					err = iam.DeleteRolePolicy("ecs-"+serviceName, "paramstore-"+lastNamespace)
-					if err != nil {
-						return err
-					}
-					err = iam.PutRolePolicy("ecs-"+serviceName, "paramstore-"+thisNamespace, ps.GetParamstoreIAMPolicy(thisNamespace))
-					if err != nil {
-						return err
-					}
+				err = iam.PutRolePolicy("ecs-"+serviceName, "paramstore-"+thisNamespace, ps.GetParamstoreIAMPolicy(thisNamespace))
+				if err != nil {
+					return err
 				}
 			}
 		}
@@ -750,7 +757,10 @@ func (c *Controller) Resume() error {
 	if err != nil {
 		if err.Error() == "dynamo: no item found" {
 			controllerLogger.Infof("Database is empty - starting app for the first time")
-			return nil
+			err = s.InitDB(apiVersion)
+			if err != nil {
+				return err
+			}
 		} else {
 			return err
 		}

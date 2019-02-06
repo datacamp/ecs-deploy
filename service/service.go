@@ -107,6 +107,19 @@ func NewService() *Service {
 	return &s
 }
 
+func (s *Service) InitDB(apiVersion string) error {
+	ds := &DynamoServices{ApiVersion: apiVersion, ServiceName: "__SERVICES", Time: "0", Version: 1, Services: []*DynamoServicesElement{}}
+
+	// __SERVICE not found, write first record
+	err := s.table.Put(ds).Run()
+
+	if err != nil {
+		serviceLogger.Errorf("Error during put of first record: %v", err.Error())
+		return err
+	}
+	return nil
+}
+
 func (s *Service) initService(dsElement *DynamoServicesElement) error {
 	ds := &DynamoServices{ServiceName: "__SERVICES", Time: "0", Version: 1, Services: []*DynamoServicesElement{dsElement}}
 
@@ -211,6 +224,20 @@ func (s *Service) CreateService(dsElement *DynamoServicesElement) error {
 		}
 	}
 	return nil
+}
+func (s *Service) ServiceExistsInDynamo() (bool, error) {
+	var ds DynamoServices
+	err := s.GetServices(&ds)
+	if err != nil {
+		serviceLogger.Errorf(err.Error())
+		return false, err
+	}
+	for _, a := range ds.Services {
+		if a.S == s.ServiceName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 func (s *Service) NewDeployment(taskDefinitionArn *string, d *Deploy) (*DynamoDeployment, error) {
 	day := time.Now().Format("2006-01-02")
