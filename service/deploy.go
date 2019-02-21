@@ -30,22 +30,24 @@ type Deploy struct {
 	EnvNamespace          string                      `json:"envNamespace" yaml:"envNamespace"`
 }
 type DeployContainer struct {
-	ContainerName     string                        `json:"containerName" yaml:"containerName" binding:"required"`
-	ContainerTag      string                        `json:"containerTag" yaml:"containerTag" binding:"required"`
-	ContainerPort     int64                         `json:"containerPort" yaml:"containerPort"`
-	ContainerCommand  []*string                     `json:"containerCommand" yaml:"containerCommand"`
-	ContainerImage    string                        `json:"containerImage" yaml:"containerImage"`
-	ContainerURI      string                        `json:"containerURI" yaml:"containerURI"`
-	Essential         bool                          `json:"essential" yaml:"essential"`
-	Memory            int64                         `json:"memory" yaml:"memory"`
-	MemoryReservation int64                         `json:"memoryReservation" yaml:"memoryReservation"`
-	CPU               int64                         `json:"cpu" yaml:"cpu"`
-	CPUReservation    int64                         `json:"cpuReservation" yaml:"cpuReservation"`
-	DockerLabels      map[string]string             `json:"dockerLabels" yaml:"dockerLabels"`
-	HealthCheck       DeployContainerHealthCheck    `json:"healthCheck" yaml:"healthCheck"`
-	Environment       []*DeployContainerEnvironment `json:"environment" yaml:"environment"`
-	MountPoints       []*DeployContainerMountPoint  `json:"mountPoints" yaml:"mountPoints"`
-	Ulimits           []*DeployContainerUlimit      `json:"ulimits" yaml:"ulimits"`
+	ContainerName       string                        `json:"containerName" yaml:"containerName" binding:"required"`
+	ContainerTag        string                        `json:"containerTag" yaml:"containerTag" binding:"required"`
+	ContainerPort       int64                         `json:"containerPort" yaml:"containerPort"`
+	ContainerCommand    []*string                     `json:"containerCommand" yaml:"containerCommand"`
+	ContainerImage      string                        `json:"containerImage" yaml:"containerImage"`
+	ContainerURI        string                        `json:"containerURI" yaml:"containerURI"`
+	ContainerEntryPoint []*string                     `json:"containerEntryPoint" yaml:"containerEntryPoint"`
+	Essential           bool                          `json:"essential" yaml:"essential"`
+	Memory              int64                         `json:"memory" yaml:"memory"`
+	MemoryReservation   int64                         `json:"memoryReservation" yaml:"memoryReservation"`
+	CPU                 int64                         `json:"cpu" yaml:"cpu"`
+	CPUReservation      int64                         `json:"cpuReservation" yaml:"cpuReservation"`
+	DockerLabels        map[string]string             `json:"dockerLabels" yaml:"dockerLabels"`
+	HealthCheck         DeployContainerHealthCheck    `json:"healthCheck" yaml:"healthCheck"`
+	Environment         []*DeployContainerEnvironment `json:"environment" yaml:"environment"`
+	MountPoints         []*DeployContainerMountPoint  `json:"mountPoints" yaml:"mountPoints"`
+	Ulimits             []*DeployContainerUlimit      `json:"ulimits" yaml:"ulimits"`
+	Links               []*string                     `json:"links" yaml:"links"`
 }
 type DeployContainerUlimit struct {
 	Name      string `json:"name" yaml:"name"`
@@ -98,11 +100,19 @@ type DeployStickiness struct {
 	Duration int64 `json:"duration" yaml:"duration"`
 }
 type DeployVolume struct {
-	Host DeployVolumeHost `json:"host" yaml:"host"`
-	Name string           `json:"name" yaml:"name"`
+	Host                      DeployVolumeHost                      `json:"host" yaml:"host"`
+	DockerVolumeConfiguration DeployVolumeDockerVolumeConfiguration `json:"dockerVolumeConfiguration" yaml:"dockerVolumeConfiguration"`
+	Name                      string                                `json:"name" yaml:"name"`
 }
 type DeployVolumeHost struct {
 	SourcePath string `json:"sourcePath" yaml:"sourcePath"`
+}
+type DeployVolumeDockerVolumeConfiguration struct {
+	Scope         string            `json:"scope" yaml:"scope"`
+	Autoprovision bool              `json:"autoprovision" yaml:"autoprovision"`
+	Driver        string            `json:"driver" yaml:"driver"`
+	DriverOpts    map[string]string `json:"driverOpts" yaml:"driverOpts"`
+	Labels        map[string]string `json:"labels" yaml:"labels"`
 }
 
 type DeployResult struct {

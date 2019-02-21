@@ -287,12 +287,29 @@ func (e *ECS) CreateTaskDefinition(d service.Deploy) (*string, error) {
 	if len(d.Volumes) > 0 {
 		var volumes []*ecs.Volume
 		for _, vol := range d.Volumes {
-			volumes = append(volumes, &ecs.Volume{
+			volume := &ecs.Volume{
 				Name: aws.String(vol.Name),
-				Host: &ecs.HostVolumeProperties{
+			}
+			if len(vol.Host.SourcePath) > 0 {
+				volume.SetHost(&ecs.HostVolumeProperties{
 					SourcePath: aws.String(vol.Host.SourcePath),
-				},
-			})
+				})
+			}
+			if len(vol.DockerVolumeConfiguration.Scope) > 0 {
+				volumeConfig := &ecs.DockerVolumeConfiguration{
+					Autoprovision: aws.Bool(vol.DockerVolumeConfiguration.Autoprovision),
+					Driver:        aws.String(vol.DockerVolumeConfiguration.Driver),
+					Scope:         aws.String(vol.DockerVolumeConfiguration.Scope),
+				}
+				if len(vol.DockerVolumeConfiguration.DriverOpts) > 0 {
+					volumeConfig.SetDriverOpts(aws.StringMap(vol.DockerVolumeConfiguration.DriverOpts))
+				}
+				if len(vol.DockerVolumeConfiguration.Labels) > 0 {
+					volumeConfig.SetLabels(aws.StringMap(vol.DockerVolumeConfiguration.Labels))
+				}
+				volume.SetDockerVolumeConfiguration(volumeConfig)
+			}
+			volumes = append(volumes, volume)
 		}
 		e.TaskDefinition.SetVolumes(volumes)
 	}
@@ -358,6 +375,10 @@ func (e *ECS) CreateTaskDefinition(d service.Deploy) (*string, error) {
 		// set containerCommand if not empty
 		if len(container.ContainerCommand) > 0 {
 			containerDefinition.SetCommand(container.ContainerCommand)
+		}
+		// set containerEntryPoint if not empty
+		if len(container.ContainerEntryPoint) > 0 {
+			containerDefinition.SetEntryPoint(container.ContainerEntryPoint)
 		}
 		// set cloudwacht logs if enabled
 		if util.GetEnv("CLOUDWATCH_LOGS_ENABLED", "no") == "yes" {
@@ -440,6 +461,11 @@ func (e *ECS) CreateTaskDefinition(d service.Deploy) (*string, error) {
 				})
 			}
 			containerDefinition.SetMountPoints(mps)
+		}
+
+		// Links
+		if len(container.Links) > 0 {
+			containerDefinition.SetLinks(container.Links)
 		}
 
 		e.TaskDefinition.ContainerDefinitions = append(e.TaskDefinition.ContainerDefinitions, containerDefinition)
